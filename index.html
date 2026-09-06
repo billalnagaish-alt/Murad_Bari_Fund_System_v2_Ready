@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Murad Bari Social Welfare Fund</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="loginPage" class="login-page">
+    <div class="login-card">
+      <div class="brand-mark">MB</div>
+      <h1 data-t="title">মুরাদবাড়ি সামাজিক কল্যাণ ফান্ড</h1>
+      <p data-t="subtitle">সামাজিক কল্যাণ ও আর্থিক সহায়তা ব্যবস্থাপনা</p>
+      <label>Login ID</label>
+      <input id="loginId" autocomplete="username" placeholder="admin">
+      <label>Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button class="primary full" type="button" onclick="doLogin()">🔐 <span data-t="login">লগইন</span></button>
+      <button class="lang-btn" type="button" onclick="toggleLang()">বাংলা / English</button>
+      <div id="msg" class="msg"></div>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div>
+        <div class="app-title" data-t="title">মুরাদবাড়ি সামাজিক কল্যাণ ফান্ড</div>
+        <div class="app-subtitle" data-t="subtitle">সামাজিক কল্যাণ ও আর্থিক সহায়তা ব্যবস্থাপনা</div>
+      </div>
+      <div class="top-actions">
+        <span id="user" class="user-pill"></span>
+        <button class="ghost" onclick="toggleLang()">বাংলা / English</button>
+        <button class="danger" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <button onclick="show('dashboard')" class="nav-btn">🏠 <span data-t="dashboard">ড্যাশবোর্ড</span></button>
+        <button onclick="show('activities')" class="nav-btn">📋 <span data-t="activities">কার্যক্রম</span></button>
+        <button onclick="show('donors')" class="nav-btn">👥 <span data-t="donorsMenu">দাতা</span></button>
+        <button onclick="show('collections')" class="nav-btn">💰 <span data-t="collections">দাতা ও সংগ্রহ</span></button>
+        <button onclick="show('expenses')" class="nav-btn">💸 <span data-t="expenses">খরচ ও সহায়তা</span></button>
+        <button onclick="show('custody')" class="nav-btn">🏦 <span data-t="custody">ফান্ড কোথায়</span></button>
+        <button onclick="show('reports')" class="nav-btn">📊 <span data-t="reports">রিপোর্ট</span></button>
+        <button id="usersNav" onclick="show('users')" class="nav-btn" hidden>👤 <span data-t="users">ব্যবহারকারী</span></button>
+        <button id="auditNav" onclick="show('audit')" class="nav-btn" hidden>🧾 <span data-t="audit">অডিট লগ</span></button>
+        <button id="settingsNav" onclick="show('settings')" class="nav-btn" hidden>⚙️ <span data-t="settings">সেটিংস</span></button>
+      </aside>
+
+      <main>
+        <section id="dashboard">
+          <div class="section-head"><div><h2 data-t="dashboard">ড্যাশবোর্ড</h2><p>Fund overview</p></div></div>
+          <div class="cards">
+            <div class="stat"><span>💰</span><div><small data-t="totalCollection">মোট সংগ্রহ</small><strong id="totalCollection">৳0</strong></div></div>
+            <div class="stat"><span>💸</span><div><small data-t="totalExpense">মোট খরচ</small><strong id="totalExpense">৳0</strong></div></div>
+            <div class="stat"><span>🏦</span><div><small data-t="currentFund">বর্তমান ফান্ড</small><strong id="balance">৳0</strong></div></div>
+            <div class="stat"><span>👥</span><div><small data-t="donors">দাতা</small><strong id="donorCount">0</strong></div></div>
+          </div>
+          <div class="panel"><h3 data-t="yearSummary">বছরভিত্তিক কার্যক্রম</h3><div id="yearSummary"></div></div>
+        </section>
+
+        <section id="activities" hidden><div class="section-head"><h2>📋 <span data-t="activities">কার্যক্রম</span></h2></div><div id="activitiesTable"></div></section>
+        <section id="donors" hidden><div class="section-head"><h2>👥 <span data-t="donorsMenu">দাতা</span></h2></div><div id="donorsTable"></div></section>
+        <section id="collections" hidden><div class="section-head"><h2>💰 <span data-t="collections">দাতা ও সংগ্রহ</span></h2></div><div id="collectionsTable"></div></section>
+        <section id="expenses" hidden><div class="section-head"><h2>💸 <span data-t="expenses">খরচ ও সহায়তা</span></h2></div><div id="expensesTable"></div></section>
+        <section id="custody" hidden>
+          <div class="section-head"><div><h2>🏦 <span data-t="custody">ফান্ড কোথায়</span></h2><p>নিজে, ব্যাংক বা অন্য ব্যক্তির কাছে থাকা ফান্ডের বিস্তারিত রেকর্ড</p></div></div>
+          <div class="custody-note">এখানে Amount, Custodian, Date, Reason, Terms, Witnesses, Expected Return Date ও Status রাখা যাবে।</div>
+          <div id="custodyTable"></div>
+        </section>
+        <section id="reports" hidden><div class="section-head"><h2>📊 <span data-t="reports">রিপোর্ট</span></h2></div><div class="panel"><p>বর্তমান backend-এ Reports data পড়া যায়। Report records এখান থেকে দেখা যাবে যখন Reports table-এ data থাকবে।</p></div></section>
+        <section id="users" hidden><div class="section-head"><h2>👤 <span data-t="users">ব্যবহারকারী</span></h2></div><div id="usersTable"></div></section>
+        <section id="audit" hidden><div class="section-head"><h2>🧾 <span data-t="audit">অডিট লগ</span></h2></div><div id="auditTable"></div></section>
+        <section id="settings" hidden><div class="section-head"><h2>⚙️ <span data-t="settings">সেটিংস</span></h2></div><div class="panel"><label>System Name</label><input id="systemName" readonly><label>Language</label><input id="systemLanguage" readonly></div></section>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
