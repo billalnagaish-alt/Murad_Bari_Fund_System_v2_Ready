@@ -10,6 +10,84 @@ const API_URL =
 
 let lang = "bn";
 let currentUser = null;
+let sessionToken = "";
+
+/* Browser session helpers */
+function saveSession(user, token) {
+
+  sessionToken = String(token || "");
+  currentUser = user || null;
+
+  if (sessionToken) {
+    localStorage.setItem(
+      "MBF_SESSION_TOKEN",
+      sessionToken
+    );
+  } else {
+    localStorage.removeItem(
+      "MBF_SESSION_TOKEN"
+    );
+  }
+
+  if (currentUser) {
+    localStorage.setItem(
+      "MBF_CURRENT_USER",
+      JSON.stringify(currentUser)
+    );
+  } else {
+    localStorage.removeItem(
+      "MBF_CURRENT_USER"
+    );
+  }
+}
+
+
+function clearSession() {
+
+  sessionToken = "";
+  currentUser = null;
+
+  try {
+    localStorage.removeItem(
+      "MBF_SESSION_TOKEN"
+    );
+
+    localStorage.removeItem(
+      "MBF_CURRENT_USER"
+    );
+  } catch(error) {
+    console.warn(
+      "Could not clear local session:",
+      error
+    );
+  }
+}
+
+
+function showLoginMessage(message) {
+
+  const loginPage =
+    document.getElementById("loginPage");
+
+  const app =
+    document.getElementById("app");
+
+  const msg =
+    document.getElementById("msg");
+
+  if (loginPage) {
+    loginPage.hidden = false;
+  }
+
+  if (app) {
+    app.hidden = true;
+  }
+
+  if (msg) {
+    msg.textContent =
+      message || "";
+  }
+}
 
 let data = {
   activities: [],
@@ -102,6 +180,40 @@ async function api(action,payload={}) {
 
   try {
 
+    const requestPayload =
+      Object.assign({}, payload || {});
+
+    /*
+     * IMPORTANT:
+     * Backend v2.2 requires p.token for every protected action.
+     * Login does not need a token.
+     * Automatically attach the saved session token so that
+     * getData/add/update/delete/etc. do not lose the session.
+     */
+    if (action !== "login" && action !== "logout") {
+
+      const token =
+        sessionToken ||
+        localStorage.getItem("MBF_SESSION_TOKEN") ||
+        "";
+
+      if (token) {
+        requestPayload.token = token;
+      }
+    }
+
+    if (action === "logout") {
+
+      const token =
+        sessionToken ||
+        localStorage.getItem("MBF_SESSION_TOKEN") ||
+        "";
+
+      if (token) {
+        requestPayload.token = token;
+      }
+    }
+
     const response =
       await fetch(API_URL,{
         method:"POST",
@@ -113,7 +225,7 @@ async function api(action,payload={}) {
 
         body:JSON.stringify({
           action:action,
-          payload:payload
+          payload:requestPayload
         })
       });
 
@@ -127,7 +239,35 @@ async function api(action,payload={}) {
     }
 
 
-    return await response.json();
+    const result =
+      await response.json();
+
+    /*
+     * Backend throws "Session expired..." when the
+     * CacheService session is gone. Clear the browser
+     * session as well, so the user can login cleanly.
+     */
+    if (
+      action !== "login" &&
+      result &&
+      (
+        String(result.message || "")
+          .toLowerCase()
+          .includes("session expired") ||
+        String(result.message || "")
+          .toLowerCase()
+          .includes("login again")
+      )
+    ) {
+
+      clearSession();
+
+      showLoginMessage(
+        "⏳ Session expired. Please login again."
+      );
+    }
+
+    return result;
 
   } catch(error) {
 
@@ -141,7 +281,9 @@ async function api(action,payload={}) {
       ok:false,
       success:false,
       message:
-        "API connection failed. Google Apps Script deployment/check করুন।"
+        error && error.message
+          ? error.message
+          : "API connection failed. Google Apps Script deployment/check করুন।"
     };
   }
 }
@@ -164,17 +306,90 @@ function initializeLoginState() {
     );
 
 
-  currentUser = null;
+  /*
+   * Restore the last browser session.
+   * The backend still remains the authority: load()
+   * will verify the token and force login if expired.
+   */
+  let savedUser = null;
+  let savedToken = "";
 
+  try {
 
-  if (loginPage) {
+    savedToken =
+      localStorage.getItem(
+        "MBF_SESSION_TOKEN"
+      ) || "";
 
-    loginPage.hidden = false;
+    const savedUserRaw =
+      localStorage.getItem(
+        "MBF_CURRENT_USER"
+      );
+
+    if (savedUserRaw) {
+      savedUser =
+        JSON.parse(savedUserRaw);
+    }
+
+  } catch(error) {
+
+    console.warn(
+      "Could not restore saved session:",
+      error
+    );
+
+    clearSession();
   }
 
 
-  if (app) {
+  sessionToken = savedToken;
+  currentUser = savedUser;
 
+
+  if (
+    currentUser &&
+    sessionToken
+  ) {
+
+    if (loginPage) {
+      loginPage.hidden = true;
+    }
+
+    if (app) {
+      app.hidden = false;
+    }
+
+    const userEl =
+      document.getElementById("user");
+
+    if (userEl) {
+      userEl.textContent =
+        currentUser.name +
+        " (" +
+        currentUser.role +
+        ")";
+    }
+
+    setupAdminMenu();
+
+    /*
+     * Verify the server-side session.
+     * If CacheService has expired, api()/load() will
+     * clear it and return the login screen.
+     */
+    load();
+
+    return;
+  }
+
+
+  clearSession();
+
+  if (loginPage) {
+    loginPage.hidden = false;
+  }
+
+  if (app) {
     app.hidden = true;
   }
 }
@@ -255,8 +470,9 @@ async function doLogin() {
 
 
   if (
-    !result.ok &&
-    !result.success
+    !result ||
+    result.ok !== true ||
+    result.success !== true
   ) {
 
     if (msg) {
@@ -270,8 +486,26 @@ async function doLogin() {
   }
 
 
-  currentUser =
-    result.user;
+  if (!result.user || !result.token) {
+
+    if (msg) {
+      msg.textContent =
+        "Login response-এ user/token পাওয়া যায়নি।";
+    }
+
+    console.error(
+      "Invalid login response:",
+      result
+    );
+
+    return;
+  }
+
+
+  saveSession(
+    result.user,
+    result.token
+  );
 
 
   const loginPage =
@@ -334,11 +568,35 @@ async function doLogin() {
    LOGOUT
 ===================================================== */
 
-function logout() {
+async function logout() {
 
-  currentUser = null;
+  const token =
+    sessionToken ||
+    localStorage.getItem(
+      "MBF_SESSION_TOKEN"
+    ) ||
+    "";
 
-  location.reload();
+  try {
+
+    if (token) {
+      await api("logout", {
+        token:token
+      });
+    }
+
+  } catch(error) {
+
+    console.warn(
+      "Logout API failed:",
+      error
+    );
+
+  } finally {
+
+    clearSession();
+    location.reload();
+  }
 }
 
 
@@ -348,13 +606,11 @@ function logout() {
 
 function requireLogin() {
 
-  if (!currentUser) {
+  if (!currentUser || !sessionToken) {
 
-    alert(
+    showLoginMessage(
       "অনুগ্রহ করে প্রথমে Login করুন।"
     );
-
-    initializeLoginState();
 
     return false;
   }
@@ -380,15 +636,30 @@ async function load() {
 
 
   if (
-    !result.ok &&
-    !result.success
+    !result ||
+    result.ok !== true ||
+    result.success !== true
   ) {
 
-    alert(
-      result.message ||
-      "Data loading failed"
-    );
+    const message =
+      result && result.message
+        ? result.message
+        : "Data loading failed";
 
+    if (
+      message.toLowerCase().includes("session expired") ||
+      message.toLowerCase().includes("login again")
+    ) {
+
+      clearSession();
+      showLoginMessage(
+        "⏳ Session expired. Please login again."
+      );
+
+      return;
+    }
+
+    alert(message);
     return;
   }
 
